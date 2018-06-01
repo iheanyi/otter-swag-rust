@@ -1,0 +1,15 @@
+[package]
+name = "otter-swag-rust"
+version = "0.1.0"
+authors = ["Iheanyi Ekechukwu <iekechukwu@gmail.com>"]
+
+[dependencies]
+
+[dependencies.sdl2]
+version = "0.31"
+default-features = false
+features = ["ttf","image","gfx","mixer"]
+
+[[bin]]
+name = "otter-swag-rust"
+path = "main.rs"
