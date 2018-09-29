@@ -1,5 +1,4 @@
 use sdl2::rect::Rect;
-use sdl2::render::Texture;
 
 const MENU_TILE_SIZE: (u32, u32) = (480, 320);
 
@@ -39,16 +38,14 @@ impl MenuState {
     }
 }
 
-pub struct Menu<'r> {
-    pub texture: &'r Texture<'r>,
+pub struct Menu {
     pub state: MenuState,
 }
 
-impl<'r> Menu<'r> {
-    pub fn new(texture: &'r Texture) -> Self {
+impl Menu {
+    pub fn new() -> Self {
         return Menu {
             state: MenuState::new_start(),
-            texture: texture,
         };
     }
 

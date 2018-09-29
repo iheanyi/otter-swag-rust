@@ -8,16 +8,21 @@ use sdl2::event::Event;
 use sdl2::image::{INIT_JPG, INIT_PNG};
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
+use sdl2::render::Texture;
 use sdl2::surface::Surface;
 use std::path::Path;
 
 pub struct OtterSwag<'r> {
-    menu: Menu<'r>,
+    menu: Menu,
+    menu_texture: &'r Texture<'r>,
 }
 
 impl<'r> OtterSwag<'r> {
-    pub fn new(menu: Menu) -> OtterSwag {
-        return OtterSwag { menu: menu };
+    pub fn new(menu: Menu, menu_texture: &'r Texture) -> Self {
+        return OtterSwag {
+            menu: menu,
+            menu_texture: menu_texture,
+        };
     }
 
     pub fn start(&mut self) {
@@ -59,32 +64,11 @@ pub fn main() {
 
     let menu_tile_size = (480, 320);
 
-    let menu = Menu::new(&menu_texture);
+    let menu = Menu::new();
 
     // Start Menu Screen
     let dst_rect_start = Rect::new(0, 0, menu_tile_size.0, menu_tile_size.1);
-
-    canvas.clear();
-    canvas
-        .copy_ex(&background_texture, None, None, 0.0, None, false, false)
-        .unwrap();
-
-    canvas
-        .copy_ex(
-            &menu_texture,
-            menu.get_source_rect(),
-            dst_rect_start,
-            0.0,
-            None,
-            false,
-            false,
-        )
-        .unwrap();
-    // In the starting state, we want to copy the starting menu screen as well
-    // onto the menu as well.
-    canvas.present();
-
-    let mut game = OtterSwag::new(menu);
+    let mut game = OtterSwag::new(menu, &menu_texture);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut frame: u32 = 0;
@@ -146,7 +130,11 @@ pub fn main() {
         // If our menu is visible, we're going to draw that onto our canvas.
         if game.menu.is_visible() {
             canvas
-                .copy(&menu_texture, game.menu.get_source_rect(), dst_rect_start)
+                .copy(
+                    game.menu_texture,
+                    game.menu.get_source_rect(),
+                    dst_rect_start,
+                )
                 .unwrap();
         }
         // TODO: Draw the otter on top of here too.
