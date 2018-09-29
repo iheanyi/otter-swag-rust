@@ -1,1 +1,3 @@
-mod menu;
+pub mod menu;
+
+pub use self::menu::Menu;
