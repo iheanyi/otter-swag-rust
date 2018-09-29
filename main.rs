@@ -11,16 +11,16 @@ use sdl2::rect::Rect;
 use sdl2::surface::Surface;
 use std::path::Path;
 
-pub struct OtterSwag<'a> {
-    menu: Menu<'a>,
+pub struct OtterSwag<'r> {
+    menu: Menu<'r>,
 }
 
-impl<'a> OtterSwag<'a> {
+impl<'r> OtterSwag<'r> {
     pub fn new(menu: Menu) -> OtterSwag {
         return OtterSwag { menu: menu };
     }
 
-    pub fn start(&self) {
+    pub fn start(&mut self) {
         self.menu.to_playing();
     }
     pub fn state(&self) -> MenuState {
@@ -84,7 +84,7 @@ pub fn main() {
     // onto the menu as well.
     canvas.present();
 
-    let game = OtterSwag::new(menu);
+    let mut game = OtterSwag::new(menu);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut frame: u32 = 0;

@@ -1,7 +1,7 @@
 use sdl2::rect::Rect;
 use sdl2::render::Texture;
 
-const menu_tile_size: (u32, u32) = (480, 320);
+const MENU_TILE_SIZE: (u32, u32) = (480, 320);
 
 #[derive(Copy, Clone)]
 pub enum MenuState {
@@ -12,7 +12,7 @@ pub enum MenuState {
 
 impl MenuState {
     fn new_start() -> Self {
-        let source_rect_start = Rect::new(12, 32, menu_tile_size.0, menu_tile_size.1);
+        let source_rect_start = Rect::new(12, 32, MENU_TILE_SIZE.0, MENU_TILE_SIZE.1);
 
         return MenuState::StartScreen {
             source_rect: source_rect_start,
@@ -22,7 +22,7 @@ impl MenuState {
 
     fn new_playing() -> Self {
         // TODO: Transform to a dynamic point counter.
-        let source_rect_start = Rect::new(12, 32, menu_tile_size.0, menu_tile_size.1);
+        let source_rect_start = Rect::new(12, 32, MENU_TILE_SIZE.0, MENU_TILE_SIZE.1);
         return MenuState::Playing {
             source_rect: source_rect_start,
             is_visible: false,
@@ -30,7 +30,7 @@ impl MenuState {
     }
 
     fn new_game_over() -> Self {
-        let source_rect_start = Rect::new(12, 505, menu_tile_size.0, menu_tile_size.1);
+        let source_rect_start = Rect::new(12, 505, MENU_TILE_SIZE.0, MENU_TILE_SIZE.1);
 
         return MenuState::GameOver {
             source_rect: source_rect_start,
@@ -39,13 +39,13 @@ impl MenuState {
     }
 }
 
-pub struct Menu<'a> {
-    pub texture: Texture<'a>,
+pub struct Menu<'r> {
+    pub texture: &'r Texture<'r>,
     pub state: MenuState,
 }
 
-impl<'a> Menu<'a> {
-    pub fn new(texture: &'a Texture) -> Self {
+impl<'r> Menu<'r> {
+    pub fn new(texture: &'r Texture) -> Self {
         return Menu {
             state: MenuState::new_start(),
             texture: texture,
@@ -75,17 +75,17 @@ impl<'a> Menu<'a> {
 
     pub fn get_source_rect(&self) -> Rect {
         match self.state {
-            MenuState::StartScreen { source_rect, .. } => return source_rect,
-            MenuState::Playing { source_rect, .. } => return source_rect,
-            MenuState::GameOver { source_rect, .. } => return source_rect,
+            MenuState::StartScreen { source_rect, .. }
+            | MenuState::Playing { source_rect, .. }
+            | MenuState::GameOver { source_rect, .. } => return source_rect,
         };
     }
 
     pub fn is_visible(&self) -> bool {
         match self.state {
-            MenuState::StartScreen { is_visible, .. } => return is_visible,
-            MenuState::Playing { is_visible, .. } => return is_visible,
-            MenuState::GameOver { is_visible, .. } => return is_visible,
+            MenuState::StartScreen { is_visible, .. }
+            | MenuState::Playing { is_visible, .. }
+            | MenuState::GameOver { is_visible, .. } => return is_visible,
         };
     }
 }
