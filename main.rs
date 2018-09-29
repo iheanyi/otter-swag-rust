@@ -1,5 +1,9 @@
 extern crate sdl2;
 
+#[macro_use]
+mod models;
+
+use models::menu::{Menu, MenuState};
 use sdl2::event::Event;
 use sdl2::image::{INIT_JPG, INIT_PNG};
 use sdl2::keyboard::Keycode;
@@ -7,39 +11,20 @@ use sdl2::rect::Rect;
 use sdl2::surface::Surface;
 use std::path::Path;
 
-mod otter_swag {
-    #[derive(Copy, Clone)]
-    pub enum State {
-        Playing,
-        GameOver,
-        StartScreen,
+pub struct OtterSwag<'a> {
+    menu: Menu<'a>,
+}
+
+impl<'a> OtterSwag<'a> {
+    pub fn new(menu: Menu) -> OtterSwag {
+        return OtterSwag { menu: menu };
     }
 
-    #[derive(Copy, Clone)]
-    pub enum OtterState {
-        Normal,
-        Super,
-        Dead,
+    pub fn start(&self) {
+        self.menu.to_playing();
     }
-
-    pub struct OtterSwag {
-        state: State,
-    }
-
-    impl OtterSwag {
-        pub fn new() -> OtterSwag {
-            return OtterSwag {
-                state: State::StartScreen,
-            };
-        }
-
-        pub fn start(&mut self) {
-            self.state = State::Playing
-        }
-
-        pub fn state(&self) -> State {
-            self.state
-        }
+    pub fn state(&self) -> MenuState {
+        self.menu.state
     }
 }
 
@@ -58,14 +43,15 @@ pub fn main() {
     let mut canvas = window.into_canvas().build().unwrap();
     let texture_creator = canvas.texture_creator();
 
-    let background_path = Path::new("background.bmp");
+    let background_path = Path::new("assets/background.bmp");
+
     // Load the background image
     let background_surface = Surface::load_bmp(background_path).unwrap();
     let background_texture = texture_creator
         .create_texture_from_surface(&background_surface)
         .unwrap();
 
-    let menu_path = Path::new("menuScreens.bmp");
+    let menu_path = Path::new("assets/menuScreens.bmp");
     let menu_surface = Surface::load_bmp(menu_path).unwrap();
     let menu_texture = texture_creator
         .create_texture_from_surface(&menu_surface)
@@ -73,8 +59,9 @@ pub fn main() {
 
     let menu_tile_size = (480, 320);
 
+    let menu = Menu::new(&menu_texture);
+
     // Start Menu Screen
-    let mut source_rect_start = Rect::new(0, 0, menu_tile_size.0, menu_tile_size.1);
     let dst_rect_start = Rect::new(0, 0, menu_tile_size.0, menu_tile_size.1);
 
     canvas.clear();
@@ -85,7 +72,7 @@ pub fn main() {
     canvas
         .copy_ex(
             &menu_texture,
-            source_rect_start,
+            menu.get_source_rect(),
             dst_rect_start,
             0.0,
             None,
@@ -97,7 +84,7 @@ pub fn main() {
     // onto the menu as well.
     canvas.present();
 
-    let mut game = otter_swag::OtterSwag::new();
+    let game = OtterSwag::new(menu);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut frame: u32 = 0;
@@ -116,17 +103,17 @@ pub fn main() {
                     ..
                 } => {
                     match game.state() {
-                        otter_swag::State::StartScreen => {
+                        MenuState::StartScreen { .. } => {
                             // Start Game loop.
                             println!("We're in the start screen still.");
                             game.start();
                         }
-                        otter_swag::State::Playing => {
+                        MenuState::Playing { .. } => {
                             // Start Game loop.
                             println!("We're in the play screen")
                             // TODO: The otter should start moving up.
                         }
-                        otter_swag::State::GameOver => {
+                        MenuState::GameOver { .. } => {
                             println!("We're in the end game state")
                             // TODO: Reset the game world and start the game over again.
                         }
@@ -152,44 +139,17 @@ pub fn main() {
         // canvas.copy the menu screen here if the game is paused.
 
         canvas.clear();
-        match game.state() {
-            otter_swag::State::StartScreen => {
-                source_rect_start.set_x(12);
-                source_rect_start.set_y(32);
+        canvas
+            .copy(&background_texture, None, None)//, 0.0, None, false, false)
+            .unwrap();
 
-                canvas
-                    .copy(&background_texture, None, None)//, 0.0, None, false, false)
-                    .unwrap();
-
-                canvas
-                    .copy(&menu_texture, source_rect_start, dst_rect_start)
-                    .unwrap();
-            }
-            otter_swag::State::Playing => {
-                canvas
-                    .copy(&background_texture, None, None)//, 0.0, None, false, false)
-                    .unwrap();
-
-                // TODO: Render the freaking otter here through copying it.
-            }
-            otter_swag::State::GameOver => {
-                source_rect_start.set_x(505);
-                source_rect_start.set_y(32);
-
-                canvas
-                    .copy(&background_texture, None, None)//, 0.0, None, false, false)
-                    .unwrap();
-
-                canvas
-                    .copy(&menu_texture, source_rect_start, dst_rect_start)
-                    .unwrap();
-            }
+        // If our menu is visible, we're going to draw that onto our canvas.
+        if game.menu.is_visible() {
+            canvas
+                .copy(&menu_texture, game.menu.get_source_rect(), dst_rect_start)
+                .unwrap();
         }
         // TODO: Draw the otter on top of here too.
         canvas.present();
-        // The rest of the game loop goes here...
-        if let otter_swag::State::Playing = game.state() {
-            frame += 1;
-        }
     }
 }
