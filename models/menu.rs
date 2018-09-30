@@ -86,18 +86,18 @@ impl Menu {
     }
 
     pub fn get_source_rect(&self) -> Rect {
-        match self.state {
+        return match self.state {
             MenuState::StartScreen { source_rect, .. }
             | MenuState::Playing { source_rect, .. }
-            | MenuState::GameOver { source_rect, .. } => return source_rect,
+            | MenuState::GameOver { source_rect, .. } => source_rect,
         };
     }
 
     pub fn is_visible(&self) -> bool {
-        match self.state {
+        return match self.state {
             MenuState::StartScreen { is_visible, .. }
             | MenuState::Playing { is_visible, .. }
-            | MenuState::GameOver { is_visible, .. } => return is_visible,
+            | MenuState::GameOver { is_visible, .. } => is_visible,
         };
     }
 }
