@@ -122,7 +122,7 @@ pub fn main() {
     let mut game = OtterSwag::new(canvas, menu, otter, &menu_texture, &bg_texture);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
-    let mut frame: u32 = 0;
+    let mut frame: u32 = 0; // TODO: Move Frame into the Game state so we can update it from our game's `update` call
 
     // TODO: Figure out a way to encapsulate this logic inside of the Otter Swag struct
     // implementation.
@@ -141,21 +141,21 @@ pub fn main() {
                 } => {
                     match game.state() {
                         MenuState::StartScreen { .. } => {
-                            // Start Game loop.
+                            // When we're on the Start Menu Screen, we're going to start the game.
                             println!("We're in the start screen still.");
                             game.start();
                         }
                         MenuState::Playing { .. } => {
+                            // When the game is playing, it's going to be a no-op.
                             // Start Game loop.
                             println!("We're in the play screen")
                             // TODO: The otter should start moving up.
                         }
                         MenuState::GameOver { .. } => {
-                            println!("We're in the end game state")
                             // TODO: Reset the game world and start the game over again.
+                            println!("We're in the end game state")
                         }
                     }
-                    // TODO: Update state of the otter here.
                 }
                 Event::KeyDown {
                     keycode: Some(Keycode::Space),
@@ -164,13 +164,14 @@ pub fn main() {
                 } => {
                     // TODO: Update state of the otter here to be swimming.
                 }
-                _ => {}
+                _ => {
+                    // TODO: change the otter's state to be walking or whatever it is.
+                }
             }
         }
 
         // Update game loop
         if frame >= 60 {
-            // TODO: Update game state here.
             frame = 0;
         }
         game.update()
