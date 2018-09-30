@@ -13,7 +13,7 @@ use sdl2::render::{Texture, WindowCanvas};
 use sdl2::surface::Surface;
 use std::path::Path;
 
-pub struct OtterSwag<'r> {
+pub struct GameState<'r> {
     menu: Menu,
     otter: Otter,
     dst_rect: Rect,
@@ -22,7 +22,7 @@ pub struct OtterSwag<'r> {
     canvas: WindowCanvas,
 }
 
-impl<'r> OtterSwag<'r> {
+impl<'r> GameState<'r> {
     pub fn new(
         canvas: WindowCanvas,
         menu: Menu,
@@ -32,7 +32,7 @@ impl<'r> OtterSwag<'r> {
     ) -> Self {
         let menu_tile_size = (480, 320);
 
-        return OtterSwag {
+        return GameState {
             canvas: canvas,
             menu: menu,
             otter: otter,
@@ -127,7 +127,7 @@ pub fn main() {
     let otter = Otter::new();
 
     // Start Menu Screen
-    let mut game = OtterSwag::new(canvas, menu, otter, &menu_texture, &bg_texture);
+    let mut game = GameState::new(canvas, menu, otter, &menu_texture, &bg_texture);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut frame: u32 = 0; // TODO: Move Frame into the Game state so we can update it from our game's `update` call
