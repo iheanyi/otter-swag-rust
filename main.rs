@@ -4,6 +4,7 @@ extern crate sdl2;
 mod models;
 
 use models::menu::{Menu, MenuState};
+use models::otter::Otter;
 use sdl2::event::Event;
 use sdl2::image::{INIT_JPG, INIT_PNG};
 use sdl2::keyboard::Keycode;
@@ -14,13 +15,15 @@ use std::path::Path;
 
 pub struct OtterSwag<'r> {
     menu: Menu,
+    otter: Otter,
     menu_texture: &'r Texture<'r>,
 }
 
 impl<'r> OtterSwag<'r> {
-    pub fn new(menu: Menu, menu_texture: &'r Texture) -> Self {
+    pub fn new(menu: Menu, otter: Otter, menu_texture: &'r Texture) -> Self {
         return OtterSwag {
             menu: menu,
+            otter: otter,
             menu_texture: menu_texture,
         };
     }
@@ -28,8 +31,10 @@ impl<'r> OtterSwag<'r> {
     pub fn start(&mut self) {
         self.menu.to_playing();
     }
+
+    // TODO: Change to a more game-specific state.
     pub fn state(&self) -> MenuState {
-        self.menu.state
+        self.menu.state()
     }
 }
 
@@ -65,10 +70,11 @@ pub fn main() {
     let menu_tile_size = (480, 320);
 
     let menu = Menu::new();
+    let otter = Otter::new();
 
     // Start Menu Screen
     let dst_rect_start = Rect::new(0, 0, menu_tile_size.0, menu_tile_size.1);
-    let mut game = OtterSwag::new(menu, &menu_texture);
+    let mut game = OtterSwag::new(menu, otter, &menu_texture);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut frame: u32 = 0;
@@ -137,7 +143,7 @@ pub fn main() {
                 )
                 .unwrap();
         }
-        // TODO: Draw the otter on top of here too.
+        // TODO: Draw the otter on top of here as well.
         canvas.present();
     }
 }
