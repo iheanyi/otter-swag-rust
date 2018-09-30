@@ -9,22 +9,36 @@ use sdl2::event::Event;
 use sdl2::image::{INIT_JPG, INIT_PNG};
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
-use sdl2::render::Texture;
+use sdl2::render::{Texture, WindowCanvas};
 use sdl2::surface::Surface;
 use std::path::Path;
 
 pub struct OtterSwag<'r> {
     menu: Menu,
     otter: Otter,
+    dst_rect: Rect,
     menu_texture: &'r Texture<'r>,
+    bg_texture: &'r Texture<'r>,
+    canvas: WindowCanvas,
 }
 
 impl<'r> OtterSwag<'r> {
-    pub fn new(menu: Menu, otter: Otter, menu_texture: &'r Texture) -> Self {
+    pub fn new(
+        canvas: WindowCanvas,
+        menu: Menu,
+        otter: Otter,
+        menu_texture: &'r Texture,
+        bg_texture: &'r Texture,
+    ) -> Self {
+        let menu_tile_size = (480, 320);
+
         return OtterSwag {
+            canvas: canvas,
             menu: menu,
             otter: otter,
+            dst_rect: Rect::new(0, 0, menu_tile_size.0, menu_tile_size.1),
             menu_texture: menu_texture,
+            bg_texture: bg_texture,
         };
     }
 
@@ -35,6 +49,40 @@ impl<'r> OtterSwag<'r> {
     // TODO: Change to a more game-specific state.
     pub fn state(&self) -> MenuState {
         self.menu.state()
+    }
+
+    fn render_background(&mut self) {
+        self.canvas
+            .copy(self.bg_texture, None, None)//, 0.0, None, false, false)
+            .unwrap();
+    }
+
+    fn render_menu(&mut self) {
+        // If our menu is visible, we're going to draw that onto our canvas.
+        if self.menu.is_visible() {
+            self.canvas
+                .copy(
+                    self.menu_texture,
+                    self.menu.get_source_rect(),
+                    self.dst_rect,
+                )
+                .unwrap();
+        }
+    }
+
+    fn render_otter(&mut self) {
+        // TODO: Render Otter in it's current state and form here.
+    }
+
+    pub fn update(&mut self) {
+        // TODO: Add canvas drawing logic here.
+        self.canvas.clear();
+        self.render_background();
+        self.render_menu();
+
+        // TODO: Draw the otter on top of here as well.
+        self.render_otter();
+        self.canvas.present();
     }
 }
 
@@ -50,14 +98,14 @@ pub fn main() {
         .build()
         .unwrap();
 
-    let mut canvas = window.into_canvas().build().unwrap();
+    let canvas = window.into_canvas().build().unwrap();
     let texture_creator = canvas.texture_creator();
 
     let background_path = Path::new("assets/background.bmp");
 
     // Load the background image
     let background_surface = Surface::load_bmp(background_path).unwrap();
-    let background_texture = texture_creator
+    let bg_texture = texture_creator
         .create_texture_from_surface(&background_surface)
         .unwrap();
 
@@ -67,18 +115,17 @@ pub fn main() {
         .create_texture_from_surface(&menu_surface)
         .unwrap();
 
-    let menu_tile_size = (480, 320);
-
     let menu = Menu::new();
     let otter = Otter::new();
 
     // Start Menu Screen
-    let dst_rect_start = Rect::new(0, 0, menu_tile_size.0, menu_tile_size.1);
-    let mut game = OtterSwag::new(menu, otter, &menu_texture);
+    let mut game = OtterSwag::new(canvas, menu, otter, &menu_texture, &bg_texture);
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut frame: u32 = 0;
 
+    // TODO: Figure out a way to encapsulate this logic inside of the Otter Swag struct
+    // implementation.
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -126,24 +173,6 @@ pub fn main() {
             // TODO: Update game state here.
             frame = 0;
         }
-        // canvas.copy the menu screen here if the game is paused.
-
-        canvas.clear();
-        canvas
-            .copy(&background_texture, None, None)//, 0.0, None, false, false)
-            .unwrap();
-
-        // If our menu is visible, we're going to draw that onto our canvas.
-        if game.menu.is_visible() {
-            canvas
-                .copy(
-                    game.menu_texture,
-                    game.menu.get_source_rect(),
-                    dst_rect_start,
-                )
-                .unwrap();
-        }
-        // TODO: Draw the otter on top of here as well.
-        canvas.present();
+        game.update()
     }
 }
