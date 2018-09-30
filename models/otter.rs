@@ -10,7 +10,7 @@ pub enum OtterState {
 
 impl OtterState {
     pub fn new_walking() -> Self {
-        let source_rect = Rect::new(12, 33, 0, 280);
+        let source_rect = Rect::new(312, 0, 32, 32);
 
         return OtterState::Walking {
             source_rect: source_rect,

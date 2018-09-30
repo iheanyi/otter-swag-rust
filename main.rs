@@ -19,6 +19,7 @@ pub struct GameState<'r> {
     dst_rect: Rect,
     menu_texture: &'r Texture<'r>,
     bg_texture: &'r Texture<'r>,
+    otter_texture: &'r Texture<'r>,
     canvas: WindowCanvas,
 }
 
@@ -29,6 +30,7 @@ impl<'r> GameState<'r> {
         otter: Otter,
         menu_texture: &'r Texture,
         bg_texture: &'r Texture,
+        otter_texture: &'r Texture,
     ) -> Self {
         let menu_tile_size = (480, 320);
 
@@ -39,6 +41,7 @@ impl<'r> GameState<'r> {
             dst_rect: Rect::new(0, 0, menu_tile_size.0, menu_tile_size.1),
             menu_texture: menu_texture,
             bg_texture: bg_texture,
+            otter_texture: otter_texture,
         };
     }
 
@@ -70,13 +73,22 @@ impl<'r> GameState<'r> {
         }
     }
 
+    // render_otter renders the otter in its current state into the canvas.
     fn render_otter(&mut self) {
-        // TODO: Render Otter in it's current state and form here.
         match self.state() {
             MenuState::Playing { .. } => {
-                // TODO: Render the otter here.
+                // TODO: Move <x, y> coordinates into Otter struct, in addition to its dimensions?
+                let otter_dst_rect = Rect::new(0, 320 - 32, 32, 32);
+                self.canvas
+                    .copy(
+                        self.otter_texture,
+                        self.otter.get_source_rect(),
+                        otter_dst_rect,
+                    )
+                    .unwrap();
             }
             _ => {
+                // Don't render anything at all.
                 // This will be a no-op because the otter shouldn't even be visible.
             }
         }
@@ -87,8 +99,6 @@ impl<'r> GameState<'r> {
         self.canvas.clear();
         self.render_background();
         self.render_menu();
-
-        // TODO: Draw the otter on top of here as well.
         self.render_otter();
         self.canvas.present();
     }
@@ -117,17 +127,32 @@ pub fn main() {
         .create_texture_from_surface(&background_surface)
         .unwrap();
 
+    // Setup menus
     let menu_path = Path::new("assets/menuScreens.bmp");
     let menu_surface = Surface::load_bmp(menu_path).unwrap();
     let menu_texture = texture_creator
         .create_texture_from_surface(&menu_surface)
         .unwrap();
 
+    // Setup otter
+    let otter_path = Path::new("assets/otter.bmp");
+    let otter_surface = Surface::load_bmp(otter_path).unwrap();
+    let otter_texture = texture_creator
+        .create_texture_from_surface(&otter_surface)
+        .unwrap();
+
     let menu = Menu::new();
     let otter = Otter::new();
 
     // Start Menu Screen
-    let mut game = GameState::new(canvas, menu, otter, &menu_texture, &bg_texture);
+    let mut game = GameState::new(
+        canvas,
+        menu,
+        otter,
+        &menu_texture,
+        &bg_texture,
+        &otter_texture,
+    );
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut frame: u32 = 0; // TODO: Move Frame into the Game state so we can update it from our game's `update` call
@@ -170,6 +195,15 @@ pub fn main() {
                     repeat: true,
                     ..
                 } => {
+                    match game.state() {
+                        MenuState::Playing { .. } => {
+                            // We're in the playing state, so we can actually just update the
+                            // otter's state here without any fear.
+                        }
+                        _ => {
+                            // Do nothing.
+                        }
+                    }
                     // TODO: Update state of the otter here to be swimming.
                 }
                 _ => {
