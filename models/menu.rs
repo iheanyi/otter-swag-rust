@@ -2,6 +2,8 @@ use sdl2::rect::Rect;
 
 const MENU_TILE_SIZE: (u32, u32) = (480, 320);
 
+// MenuState keeps track of the state of the menu screen. There's a state for when the game first
+// starts, when the user is currently playing, and when it's game over.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum MenuState {
     StartScreen { source_rect: Rect, is_visible: bool },
@@ -46,6 +48,7 @@ impl MenuState {
     }
 }
 
+// Menu is actually a lightweight StateMachine for the game's menu.
 pub struct Menu {
     state: MenuState,
 }
