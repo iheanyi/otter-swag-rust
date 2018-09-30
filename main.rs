@@ -72,6 +72,14 @@ impl<'r> OtterSwag<'r> {
 
     fn render_otter(&mut self) {
         // TODO: Render Otter in it's current state and form here.
+        match self.state() {
+            MenuState::Playing { .. } => {
+                // TODO: Render the otter here.
+            }
+            _ => {
+                // This will be a no-op because the otter shouldn't even be visible.
+            }
+        }
     }
 
     pub fn update(&mut self) {
