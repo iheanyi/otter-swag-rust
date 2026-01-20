@@ -1,165 +1,151 @@
+extern crate otter_swag;
 extern crate sdl2;
 
-#[macro_use]
-mod models;
-
-use models::menu::{Menu, MenuState};
-use models::otter::Otter;
+use otter_swag::*;
 use sdl2::event::Event;
-use sdl2::image::{INIT_JPG, INIT_PNG};
 use sdl2::keyboard::Keycode;
+use sdl2::mixer::{self, Channel, Chunk, AUDIO_S16LSB, DEFAULT_CHANNELS};
+use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::{Texture, WindowCanvas};
-use sdl2::surface::Surface;
+use sdl2::render::{Canvas, Texture, TextureCreator};
+use sdl2::video::{Window, WindowContext};
+use std::collections::HashMap;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
-pub struct GameState<'r> {
-    menu: Menu,
-    otter: Otter,
-    dst_rect: Rect,
-    menu_texture: &'r Texture<'r>,
-    bg_texture: &'r Texture<'r>,
-    otter_texture: &'r Texture<'r>,
-    canvas: WindowCanvas,
+const FRAME_DELAY_MS: u64 = 1000 / FRAMES_PER_SECOND as u64;
+
+/// Convert our ClipRect to SDL2 Rect
+fn to_sdl_rect(clip: ClipRect) -> Rect {
+    Rect::new(clip.x, clip.y, clip.w, clip.h)
 }
 
-impl<'r> GameState<'r> {
-    pub fn new(
-        canvas: WindowCanvas,
-        menu: Menu,
-        otter: Otter,
-        menu_texture: &'r Texture,
-        bg_texture: &'r Texture,
-        otter_texture: &'r Texture,
-    ) -> Self {
-        let menu_tile_size = (480, 320);
-
-        return GameState {
-            canvas: canvas,
-            menu: menu,
-            otter: otter,
-            dst_rect: Rect::new(0, 0, menu_tile_size.0, menu_tile_size.1),
-            menu_texture: menu_texture,
-            bg_texture: bg_texture,
-            otter_texture: otter_texture,
-        };
+/// Draw a score at the given position
+/// Returns the width of the rendered score
+fn draw_score(
+    canvas: &mut Canvas<Window>,
+    texture: &Texture,
+    digits: &[u8],
+    x: i32,
+    y: i32,
+) -> Result<i32, String> {
+    let mut current_x = x;
+    for &digit in digits {
+        let clip = NUMBER_CLIPS[digit as usize];
+        let dest = Rect::new(current_x, y, clip.w, clip.h);
+        canvas.copy(texture, to_sdl_rect(clip), dest)?;
+        current_x += DIGIT_SPACING;
     }
+    Ok(current_x - x)
+}
 
-    pub fn start(&mut self) {
-        self.menu.to_playing();
-    }
+/// Load a BMP texture with magenta transparency
+fn load_texture<'a>(
+    texture_creator: &'a TextureCreator<WindowContext>,
+    path: &str,
+) -> Result<Texture<'a>, String> {
+    let surface = sdl2::surface::Surface::load_bmp(Path::new(path))
+        .map_err(|e| format!("Failed to load {}: {}", path, e))?;
 
-    // TODO: Change to a more game-specific state.
-    pub fn state(&self) -> MenuState {
-        self.menu.state()
-    }
+    // Set color key for transparency (magenta: 255, 0, 255)
+    let mut surface = surface;
+    surface
+        .set_color_key(true, Color::RGB(255, 0, 255))
+        .map_err(|e| format!("Failed to set color key: {}", e))?;
 
-    fn render_background(&mut self) {
-        self.canvas
-            .copy(self.bg_texture, None, None)//, 0.0, None, false, false)
-            .unwrap();
-    }
+    texture_creator
+        .create_texture_from_surface(&surface)
+        .map_err(|e| format!("Failed to create texture: {}", e))
+}
 
-    fn render_menu(&mut self) {
-        // If our menu is visible, we're going to draw that onto our canvas.
-        if self.menu.is_visible() {
-            self.canvas
-                .copy(
-                    self.menu_texture,
-                    self.menu.get_source_rect(),
-                    self.dst_rect,
-                )
-                .unwrap();
+/// Sound manager for playing game audio
+struct SoundManager {
+    sounds: HashMap<SoundEffect, Chunk>,
+}
+
+impl SoundManager {
+    fn new() -> Result<Self, String> {
+        let mut sounds = HashMap::new();
+
+        // Try to load each sound, but don't fail if they're missing
+        if let Ok(chunk) = Chunk::from_file("assets/sounds/coin.wav") {
+            sounds.insert(SoundEffect::Coin, chunk);
         }
-    }
-
-    // render_otter renders the otter in its current state into the canvas.
-    fn render_otter(&mut self) {
-        match self.state() {
-            MenuState::Playing { .. } => {
-                // TODO: Move <x, y> coordinates into Otter struct, in addition to its dimensions?
-                let otter_dst_rect = Rect::new(0, 320 - 32, 32, 32);
-                self.canvas
-                    .copy(
-                        self.otter_texture,
-                        self.otter.get_source_rect(),
-                        otter_dst_rect,
-                    )
-                    .unwrap();
-            }
-            _ => {
-                // Don't render anything at all.
-                // This will be a no-op because the otter shouldn't even be visible.
-            }
+        if let Ok(chunk) = Chunk::from_file("assets/sounds/powerup.wav") {
+            sounds.insert(SoundEffect::Powerup, chunk);
         }
+        if let Ok(chunk) = Chunk::from_file("assets/sounds/boom.wav") {
+            sounds.insert(SoundEffect::Boom, chunk);
+        }
+
+        Ok(Self { sounds })
     }
 
-    pub fn update(&mut self) {
-        // TODO: Add canvas drawing logic here.
-        self.canvas.clear();
-        self.render_background();
-        self.render_menu();
-        self.render_otter();
-        self.canvas.present();
+    fn play(&self, effect: SoundEffect) {
+        if let Some(chunk) = self.sounds.get(&effect) {
+            // Play on any available channel
+            let _ = Channel::all().play(chunk, 0);
+        }
     }
 }
 
-pub fn main() {
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
-    let _image_context = sdl2::image::init(INIT_PNG | INIT_JPG).unwrap();
+fn main() -> Result<(), String> {
+    // Initialize SDL2
+    let sdl_context = sdl2::init()?;
+    let video_subsystem = sdl_context.video()?;
 
+    // Initialize audio
+    let _audio = sdl_context.audio()?;
+    mixer::open_audio(44100, AUDIO_S16LSB, DEFAULT_CHANNELS, 1024)?;
+    mixer::allocate_channels(8);
+
+    // Create window
     let window = video_subsystem
-        .window("Otter Swag", 480, 320)
+        .window("Otter Swag", SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32)
         .position_centered()
-        .opengl()
         .build()
-        .unwrap();
+        .map_err(|e| e.to_string())?;
 
-    let canvas = window.into_canvas().build().unwrap();
+    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
     let texture_creator = canvas.texture_creator();
 
-    let background_path = Path::new("assets/background.bmp");
+    // Load textures
+    let background_texture = load_texture(&texture_creator, "assets/background.bmp")?;
+    let menu_texture = load_texture(&texture_creator, "assets/menuScreens.bmp")?;
+    let otter_texture = load_texture(&texture_creator, "assets/otter.bmp")?;
+    let missile_texture = load_texture(&texture_creator, "assets/missiles.bmp")?;
+    let coin_texture = load_texture(&texture_creator, "assets/coins.bmp")?;
+    let fish_texture = load_texture(&texture_creator, "assets/LoveFish.bmp")?;
+    let numbers_texture = load_texture(&texture_creator, "assets/numbers.bmp")?;
 
-    // Load the background image
-    let background_surface = Surface::load_bmp(background_path).unwrap();
-    let bg_texture = texture_creator
-        .create_texture_from_surface(&background_surface)
-        .unwrap();
+    // Load sounds
+    let sound_manager = SoundManager::new()?;
 
-    // Setup menus
-    let menu_path = Path::new("assets/menuScreens.bmp");
-    let menu_surface = Surface::load_bmp(menu_path).unwrap();
-    let menu_texture = texture_creator
-        .create_texture_from_surface(&menu_surface)
-        .unwrap();
+    // Load and play background music (keep _music alive for entire game loop)
+    let _music = if Path::new("assets/sounds/swag.wav").exists() {
+        match mixer::Music::from_file("assets/sounds/swag.wav") {
+            Ok(music) => {
+                let _ = music.play(-1); // Loop forever
+                Some(music)
+            }
+            Err(e) => {
+                eprintln!("Failed to load music: {}", e);
+                None
+            }
+        }
+    } else {
+        None
+    };
 
-    // Setup otter
-    let otter_path = Path::new("assets/otter.bmp");
-    let otter_surface = Surface::load_bmp(otter_path).unwrap();
-    let otter_texture = texture_creator
-        .create_texture_from_surface(&otter_surface)
-        .unwrap();
+    // Initialize game
+    let mut game = Game::new();
+    let mut event_pump = sdl_context.event_pump()?;
+    let mut space_held = false;
 
-    let menu = Menu::new();
-    let otter = Otter::new();
-
-    // Start Menu Screen
-    let mut game = GameState::new(
-        canvas,
-        menu,
-        otter,
-        &menu_texture,
-        &bg_texture,
-        &otter_texture,
-    );
-
-    let mut event_pump = sdl_context.event_pump().unwrap();
-    let mut frame: u32 = 0; // TODO: Move Frame into the Game state so we can update it from our game's `update` call
-
-    // TODO: Figure out a way to encapsulate this logic inside of the Otter Swag struct
-    // implementation.
     'running: loop {
+        let frame_start = Instant::now();
+
+        // Handle events
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
@@ -167,55 +153,124 @@ pub fn main() {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
+
                 Event::KeyDown {
                     keycode: Some(Keycode::Space),
                     repeat: false,
                     ..
                 } => {
-                    match game.state() {
-                        MenuState::StartScreen { .. } => {
-                            // When we're on the Start Menu Screen, we're going to start the game.
-                            println!("We're in the start screen still.");
-                            game.start();
-                        }
-                        MenuState::Playing { .. } => {
-                            // When the game is playing, it's going to be a no-op.
-                            // Start Game loop.
-                            println!("We're in the play screen")
-                            // TODO: The otter should start moving up.
-                        }
-                        MenuState::GameOver { .. } => {
-                            // TODO: Reset the game world and start the game over again.
-                            println!("We're in the end game state")
-                        }
-                    }
+                    space_held = true;
+                    game.handle_space_pressed();
                 }
-                Event::KeyDown {
+
+                Event::KeyUp {
                     keycode: Some(Keycode::Space),
-                    repeat: true,
                     ..
                 } => {
-                    match game.state() {
-                        MenuState::Playing { .. } => {
-                            // We're in the playing state, so we can actually just update the
-                            // otter's state here without any fear.
-                        }
-                        _ => {
-                            // Do nothing.
-                        }
-                    }
-                    // TODO: Update state of the otter here to be swimming.
+                    space_held = false;
+                    game.handle_space_released();
                 }
-                _ => {
-                    // TODO: change the otter's state to be walking or whatever it is.
-                }
+
+                _ => {}
             }
         }
 
-        // Update game loop
-        if frame >= 60 {
-            frame = 0;
+        // Keep swimming up while space is held
+        if space_held && game.state == GameState::Playing {
+            game.otter.swim_up();
         }
-        game.update()
+
+        // Update game
+        game.update();
+
+        // Play any pending sounds
+        for sound in game.take_pending_sounds() {
+            sound_manager.play(sound);
+        }
+
+        // Render
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
+
+        // Draw background
+        canvas.copy(&background_texture, None, None)?;
+
+        match game.state {
+            GameState::Menu => {
+                // Draw start menu (from menuScreens.bmp)
+                let src = Rect::new(12, 32, SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
+                canvas.copy(&menu_texture, src, None)?;
+            }
+
+            GameState::Playing => {
+                // Draw coins
+                for coin in &game.coins {
+                    let clip = coin.get_clip();
+                    let dest = Rect::new(coin.x, coin.y, clip.w, clip.h);
+                    canvas.copy(&coin_texture, to_sdl_rect(clip), dest)?;
+                }
+
+                // Draw fish
+                for fish in &game.fish {
+                    let clip = fish.get_clip();
+                    let dest = Rect::new(fish.x, fish.y, clip.w, clip.h);
+                    canvas.copy(&fish_texture, to_sdl_rect(clip), dest)?;
+                }
+
+                // Draw missiles
+                for missile in &game.missiles {
+                    let clip = missile.get_clip();
+                    let dest = Rect::new(missile.x, missile.y, clip.w, clip.h);
+                    canvas.copy(&missile_texture, to_sdl_rect(clip), dest)?;
+                }
+
+                // Draw otter
+                // Use source clip dimensions but always render to 32x32 area
+                // (matches original SDL1.2 behavior - no scaling)
+                let otter_clip = game.otter.get_clip();
+                let otter_dest = Rect::new(
+                    game.otter.x,
+                    game.otter.y,
+                    otter_clip.w,
+                    otter_clip.h,
+                );
+                // Don't set blend mode - just copy with color key transparency
+                canvas.copy(&otter_texture, to_sdl_rect(otter_clip), otter_dest)?;
+
+                // Draw score in top-right corner
+                let score_digits = game.get_score_digits();
+                let score_width = (score_digits.len() as i32) * DIGIT_SPACING;
+                let score_x = SCREEN_WIDTH - score_width - 10;
+                draw_score(&mut canvas, &numbers_texture, &score_digits, score_x, 5)?;
+            }
+
+            GameState::GameOver => {
+                // Draw game over screen (x=505, y=32 in menuScreens.bmp)
+                let src = Rect::new(505, 32, SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32);
+                canvas.copy(&menu_texture, src, None)?;
+
+                // Draw final score centered on screen
+                let score_digits = game.get_score_digits();
+                let score_width = (score_digits.len() as i32) * DIGIT_SPACING;
+                let score_x = (SCREEN_WIDTH - score_width) / 2;
+                draw_score(&mut canvas, &numbers_texture, &score_digits, score_x, 135)?;
+
+                // Draw high score below
+                let high_score_digits = game.get_high_score_digits();
+                let high_score_width = (high_score_digits.len() as i32) * DIGIT_SPACING;
+                let high_score_x = (SCREEN_WIDTH - high_score_width) / 2;
+                draw_score(&mut canvas, &numbers_texture, &high_score_digits, high_score_x, 175)?;
+            }
+        }
+
+        canvas.present();
+
+        // Frame rate limiting (10 FPS like original)
+        let frame_time = frame_start.elapsed();
+        if frame_time < Duration::from_millis(FRAME_DELAY_MS) {
+            std::thread::sleep(Duration::from_millis(FRAME_DELAY_MS) - frame_time);
+        }
     }
+
+    Ok(())
 }
